@@ -9,6 +9,11 @@ function file_or_env {
     fi
 }
 
+echo "[..] Changing user/group ID"
+sudo groupmod -g "${GID}" domjudge
+sudo usermod -u "${UID}" domjudge
+echo "[ok] User ID set to ${UID} and group ID set to ${GID}"; echo
+
 echo "[..] Setting timezone"
 sudo ln -snf "/usr/share/zoneinfo/${CONTAINER_TIMEZONE}" /etc/localtime
 echo "${CONTAINER_TIMEZONE}" | sudo tee /etc/timezone
