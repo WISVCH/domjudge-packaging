@@ -37,7 +37,7 @@ Next, if you are on Linux make sure you have cgroups enabled. See the [DOMjudge 
 Now you can run DOMjudge itself using the following command:
 
 ```bash
-docker run -v [path-to-domjudge-checkout]:[path-to-domjudge-checkout] -v /sys/fs/cgroup:/sys/fs/cgroup:ro --link dj-mariadb:mariadb -it -e PROJECT_DIR=[path-to-domjudge-checkout] -p 12345:80 --name domjudge --privileged domjudge/domjudge-contributor
+docker run -v [path-to-domjudge-checkout]:[path-to-domjudge-checkout] -v /sys/fs/cgroup:/sys/fs/cgroup:ro --link dj-mariadb:mariadb -it -e UID="$(id -u)" -e GID="$(id -g)" -e PROJECT_DIR=[path-to-domjudge-checkout] -p 12345:80 --name domjudge --privileged domjudge/domjudge-contributor
 ```
 
 Make sure you replace `[path-to-domjudge-checkout]` with the path to your local DOMjudge checkout. On recent macOS and Windows Docker builds, you should add `:cached` at the end of the volume (i.e. `-v [path-to-domjudge-checkout]:[path-to-domjudge-checkout]:cached`) to speed up the webserver a lot.
@@ -57,6 +57,8 @@ bin/dj_setup_database install-examples
 
 The following environment variables are supported by the container:
 
+* `UID` (defaults to `1000`): the ID of the user to run DOMjudge as. Should match the host OS user ID.
+* `GID` (defaults to `1000`): the ID of the group to run DOMjudge as. Should match the host OS group ID.
 * `CONTAINER_TIMEZONE` (defaults to `Europe/Amsterdam`): allows you to change the timezone used inside the container.
 * `MYSQL_HOST` (defaults to `mariadb`): set the host to connect to for MySQL. Can be hostname or IP. Docker will add hostnames for any containers you `--link`, so in the example above, the MariaDB container will be available under the hostname `mariadb`.
 * `MYSQL_USER` (defaults to `domjudge`): set the user to use for connecting to MySQL.
