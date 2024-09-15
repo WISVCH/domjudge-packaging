@@ -5,4 +5,7 @@ echo "deb [trusted=yes] https://sysopspackages.icpc.global/apt/jammy jammy main"
 echo 'Acquire::https::sysopspackages.icpc.global::Verify-Peer "false";
 Acquire::https::sysopspackages.icpc.global::Verify-Host "false";' >> /etc/apt/apt.conf.d/80trust-baylor-mirror
 
+# Add pypy repository
+add-apt-repository ppa:pypy/ppa
+
 apt-get update
