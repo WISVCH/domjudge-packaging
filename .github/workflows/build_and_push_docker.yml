@@ -63,6 +63,11 @@ jobs:
             DOCKER_TAGS+=( "$INPUT_VERSION" )
           fi
 
+          if [[ "$BRANCH_TO_BUILD" == "main" ]]; then
+            BRANCH_TO_BUILD="main"
+            DOCKER_TAGS+=( "main" )
+          fi
+
           if [[ "$BRANCH_TO_BUILD" != "" ]]; then
             echo "DOCKER_TAGS: ${DOCKER_TAGS[*]}"
             echo "BRANCH_TO_BUILD: $BRANCH_TO_BUILD"
