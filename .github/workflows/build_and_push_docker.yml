@@ -63,7 +63,7 @@ jobs:
             DOCKER_TAGS+=( "$INPUT_VERSION" )
           fi
 
-          if [[ "$BRANCH_TO_BUILD" == "main" ]]; then
+          if [[ "$INPUT_VERSION" == "main" ]]; then
             BRANCH_TO_BUILD="main"
             DOCKER_TAGS+=( "main" )
           fi
