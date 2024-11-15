@@ -1,0 +1,58 @@
+name: 'Build GitLab CI container (PR)'
+
+on:
+  push:
+    paths:
+      - docker-contributor/php-config
+      - docker-gitlabci/**
+      - .github/workflows/build-gitlab-container-PR.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - docker-contributor/php-config
+      - docker-gitlabci/**
+      - .github/workflows/build-gitlab-container-PR.yml
+
+jobs:
+  pr-gitlab:
+    # Stop processing if this is a merge-queue
+    # Stop processing if this is not against our repo
+    # Always run if this PR is not from our organization
+    # Or run if this PR is not `main` (So notQueue && ourRepo && (notPROurOrg || notMain))
+    if : ${{ !contains(github.ref, 'gh-readonly-queue') &&
+             github.repository == 'domjudge/domjudge-packaging' &&
+             !(github.event.pull_request.head.repo.full_name == 'domjudge/domjudge-packaging' && github.ref == 'main') }}
+    name: PR GitLab image
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use the same PHP config as the contributor containers
+        run: cp -r docker-{contributor,gitlabci}/php-config
+
+      - name: Log in to GitHub Container registry (possibly at fork)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v5
+        with:
+          context: "./docker-gitlabci" 
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+

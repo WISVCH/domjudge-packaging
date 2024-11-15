@@ -9,7 +9,7 @@ The container includes the following:
  * Set up or update the database.
  * Set up the webserver.
  * Create a chroot.
-* PHP-FPM and nginx for running the web interface.
+* PHP-FPM and apache2 or nginx for running the web interface.
 * Two running judgedaemons using a chroot.
 * Scripts for reading the log files of the webserver and the judgedaemons.
 * A script to create a dummy DOMjudge user and submit all test submissions.
@@ -37,7 +37,7 @@ Next, if you are on Linux make sure you have cgroups enabled. See the [DOMjudge 
 Now you can run DOMjudge itself using the following command:
 
 ```bash
-docker run -v [path-to-domjudge-checkout]:[path-to-domjudge-checkout] -v /sys/fs/cgroup:/sys/fs/cgroup:ro --link dj-mariadb:mariadb -it -e PROJECT_DIR=[path-to-domjudge-checkout] -p 12345:80 --name domjudge --privileged domjudge/domjudge-contributor
+docker run -v [path-to-domjudge-checkout]:[path-to-domjudge-checkout] -v /sys/fs/cgroup:/sys/fs/cgroup:ro --link dj-mariadb:mariadb -it -e UID="$(id -u)" -e GID="$(id -g)" -e PROJECT_DIR=[path-to-domjudge-checkout] -p 12345:80 --name domjudge --privileged domjudge/domjudge-contributor
 ```
 
 Make sure you replace `[path-to-domjudge-checkout]` with the path to your local DOMjudge checkout. On recent macOS and Windows Docker builds, you should add `:cached` at the end of the volume (i.e. `-v [path-to-domjudge-checkout]:[path-to-domjudge-checkout]:cached`) to speed up the webserver a lot.
@@ -57,6 +57,8 @@ bin/dj_setup_database install-examples
 
 The following environment variables are supported by the container:
 
+* `UID` (defaults to `1000`): the ID of the user to run DOMjudge as. Should match the host OS user ID.
+* `GID` (defaults to `1000`): the ID of the group to run DOMjudge as. Should match the host OS group ID.
 * `CONTAINER_TIMEZONE` (defaults to `Europe/Amsterdam`): allows you to change the timezone used inside the container.
 * `MYSQL_HOST` (defaults to `mariadb`): set the host to connect to for MySQL. Can be hostname or IP. Docker will add hostnames for any containers you `--link`, so in the example above, the MariaDB container will be available under the hostname `mariadb`.
 * `MYSQL_USER` (defaults to `domjudge`): set the user to use for connecting to MySQL.
@@ -65,6 +67,7 @@ The following environment variables are supported by the container:
 * `MYSQL_DATABASE` (defaults to `domjudge`): set the database to use.
 * `FPM_MAX_CHILDREN` (defaults to `40`): the maximum number of PHP FPM children to spawn.
 * `DJ_SKIP_MAKE` (defaults to `0`): set to `1` to skip the maintainer setup and install commands. This will speed up the startup process of the container and is useful if this is already done before.
+* `DEFAULTWEBSERVER` (defaults to `nginx`): set to `apache2` to use the Apache2 httpd server as default webserver.
 
 #### Passwords through files
 
@@ -95,6 +98,8 @@ If you have named your container something other than `domjudge`, be sure to cha
 
 The following commands are available:
 
+* `apache2-access-log`: tail the access log of apache2.
+* `apache2-error-log`: tail the error log of apache2.
 * `nginx-access-log`: tail the access log of nginx.
 * `nginx-error-log`: tail the error log of nginx.
 * `judgedaemon-log 0` and `judgedaemon-log 1`: tail the log of the first / second judgeaemon.
@@ -103,6 +108,7 @@ The following commands are available:
 * `xdebug-enable`: enable Xdebug debugging. See note below
 * `xdebug-disable`: disable Xdebug debugging. See note below
 * `switch-php <version>`: switch to using the given PHP version.
+* `switch-webserver <apache2|nginx>`: switch to using the given webserver.
 
 Of course, you can always run `docker exec -it domjudge bash` to get a bash shell inside the container.
 
@@ -112,7 +118,7 @@ To restart any of the services, run the following:
 docker exec -it domjudge supervisorctl restart [service]
 ```
 
-where `[service]` is one of `nginx`, `php`, `judgedaemon0` or `judgedaemon1`.
+where `[service]` is one of `apache2`, `nginx`, `php`, `judgedaemon0` or `judgedaemon1`.
 
 ### Xdebug
 
