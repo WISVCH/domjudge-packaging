@@ -55,17 +55,12 @@ jobs:
             exit 0
           fi
 
-          DJ_BRANCHES=$(curl -s https://api.github.com/repos/${REPO}/branches | jq '.[].name' | rev | cut -c2- | rev | cut -c2-)
+          DJ_BRANCHES=$(curl -s https://api.github.com/repos/${REPO}/branches?per_page=100 | jq '.[].name' | rev | cut -c2- | rev | cut -c2-)
           BRANCH_TO_BUILD=""
 
           if [[ "$BRANCH_TO_BUILD" == "" ]] && echo "$DJ_BRANCHES" | grep -F -q -x "$INPUT_VERSION"; then
             BRANCH_TO_BUILD=$INPUT_VERSION
             DOCKER_TAGS+=( "$INPUT_VERSION" )
-          fi
-
-          if [[ "$INPUT_VERSION" == "main" ]]; then
-            BRANCH_TO_BUILD="main"
-            DOCKER_TAGS+=( "main" )
           fi
 
           if [[ "$BRANCH_TO_BUILD" != "" ]]; then
