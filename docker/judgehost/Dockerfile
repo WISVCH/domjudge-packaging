@@ -20,7 +20,7 @@ RUN apt update \
 	acl zip unzip supervisor sudo procps libcgroup-dev \
 	php-cli php-zip php-gd php-curl php-mysql php-json \
 	php-gmp php-xml php-mbstring python3 \
-	gcc g++ default-jre-headless default-jdk-headless ghc fp-compiler \
+	gcc g++ openjdk-17-jre-headless openjdk-17-jdk-headless ghc fp-compiler \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Install more languages
