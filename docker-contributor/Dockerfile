@@ -14,15 +14,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
   FPM_MAX_CHILDREN=40 \
   DJ_SKIP_MAKE=0 \
   DJ_DB_INSTALL_BARE=0 \
-  PHPSUPPORTED="8.1 8.2 8.3" \
-  DEFAULTPHPVERSION="8.3" \
+  PHPSUPPORTED="8.1 8.2 8.3 8.4" \
+  DEFAULTPHPVERSION="8.4" \
   DEFAULTWEBSERVER="nginx" \
   APTINSTALL="apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
 
 # Install required packages and clean up afterwards to make this image layer smaller
 RUN apt-get update \
     && apt-get install --no-install-recommends --no-install-suggests -y \
-    dumb-init autoconf automake git acl \
+    curl dumb-init autoconf automake git acl \
     gcc g++ make zip unzip mariadb-client \
     nginx php8.3 php8.3-cli php8.3-fpm php8.3-zip \
     php8.3-gd php8.3-curl php8.3-mysql php8.3-intl \
@@ -92,6 +92,22 @@ RUN for VERSION in $PHPSUPPORTED; do \
         cp -Rf /php-config/* /etc/php/${VERSION}/fpm/conf.d; \
     done; \
     rm -Rf /php-config
+
+# Install blackfire probe
+RUN for VERSION in $PHPSUPPORTED; do \
+          # Blackfire is not available yet for PHP 8.4
+          if [ "${VERSION}" != "8.4" ]; then \
+              version=$(php${VERSION} -r "echo PHP_MAJOR_VERSION.PHP_MINOR_VERSION.(PHP_ZTS ? '-zts' : '');") \
+              && architecture=$(uname -m) \
+              && curl -v -A "Docker" -o /tmp/blackfire-probe.tar.gz -D - -L -s https://blackfire.io/api/v1/releases/probe/php/linux/$architecture/$version \
+              && mkdir -p /tmp/blackfire \
+              && tar zxpf /tmp/blackfire-probe.tar.gz -C /tmp/blackfire \
+              && mv /tmp/blackfire/blackfire-*.so $(php${VERSION} -r "echo ini_get ('extension_dir');")/blackfire.so \
+              && printf "extension=blackfire.so\nblackfire.agent_socket=tcp://blackfire:8307\n" > /etc/php/${VERSION}/fpm/conf.d/blackfire.ini \
+              && printf "extension=blackfire.so\nblackfire.agent_socket=tcp://blackfire:8307\n" > /etc/php/${VERSION}/cli/conf.d/blackfire.ini \
+              && rm -rf /tmp/blackfire /tmp/blackfire-probe.tar.gz; \
+        fi; \
+    done
 
 # Disable Xdebug by default
 RUN phpdismod xdebug
