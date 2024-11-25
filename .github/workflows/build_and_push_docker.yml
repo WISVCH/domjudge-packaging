@@ -9,6 +9,7 @@ on:
     inputs:
       version:
         required: false
+        description: 'Select which branch/version of DOMjudge/DOMjudge to use'
 
 env:
   REGISTRY: ghcr.io
