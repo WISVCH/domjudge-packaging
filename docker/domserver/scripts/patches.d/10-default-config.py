@@ -18,7 +18,7 @@ for category in list_doc:
     if category["category"] == "External systems":
         for item in category["items"]:
             if item["name"] == "print_command":
-                 item["default_value"] = "/usr/bin/enscript --columns=2 --pages=-10 --landscape --pretty-print  \"--header='[original]'; page $% of $=; time=$C; room='[location]'; team='[teamname]'\" [file]"
+                 item["default_value"] = "/usr/bin/enscript --columns=2 --pages=-10 --landscape --pretty-print  \"--header='[original]'; page $% of $=; time=$C; room='[location]'; team='[teamname]'; teamid='[teamid]'\" [file]"
             if item["name"] == "data_source":
                  item["default_value"] = 1
 

@@ -33,12 +33,43 @@ These containers do not include MySQL / MariaDB; the [MariaDB](https://hub.docke
 
 These images are available on the [Docker Hub](https://hub.docker.com) as `domjudge/domserver` and `domjudge/judgehost`.
 
+### DOMjudge network
+For isolation, create a Docker network which will be used for the communication between DOMjudge-related containers.
+```bash
+docker network create dj
+```
+
+### Traefik container (Optional)
+An easy way to get trusted certificates using ACME is running the Traefik reverse proxy in front of the DOMjudge stack. Create a Docker network which allows communication across compose stacks using:
+
+```bash
+docker network create proxy_network
+```
+
+Now, you can deploy a Traefik reverse proxy. An example test deployment with **insecure** API access on port `8080` can be created using:
+
+```bash
+docker run --name traefik --net proxy_network -p 80:80 -p 443:443 -p 8080:8080 -v /letsencrypt -v /var/run/docker.sock:/var/run/docker.sock:ro traefik:v2.10 \
+  --api.insecure=true \
+  --providers.docker=true \
+  --providers.docker.exposedbydefault=false \
+  --entrypoints.web.address=:80 \
+  --entrypoints.websecure.address=:443 \
+  --certificatesresolvers.myresolver.acme.email=your-email@example.com \
+  --certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web \
+  --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
+```
+
+This will start a Traefik container listening for http traffic on port `80`, https traffic on port `443`, and listening for Traefik dashboard traffic at port `8080`.
+Traefik automatically listens to the Docker socket for running containers with labels defining reverse proxy routes.
+It also defines an ACME resolver named `myresolver` which creates a Let's Encrypt ACME account using email address `your-email@example.com` used to create the TLS certificates for https traffic.
+
 ### MariaDB container
 
 Before starting the containers, make sure you have a MySQL / MariaDB database somewhere. The easiest way to get one up and running is to use the [MariaDB](https://hub.docker.com/r/_/mariadb/) Docker container:
 
 ```bash
-docker run -it --name dj-mariadb -e MYSQL_ROOT_PASSWORD=rootpw -e MYSQL_USER=domjudge -e MYSQL_PASSWORD=djpw -e MYSQL_DATABASE=domjudge -p 13306:3306 mariadb --max-connections=1000
+docker run -it --name dj-mariadb --net dj -e MYSQL_ROOT_PASSWORD=rootpw -e MYSQL_USER=domjudge -e MYSQL_PASSWORD=djpw -e MYSQL_DATABASE=domjudge -p 13306:3306 mariadb --max-connections=1000
 ```
 
 This will start a MariaDB container, set the root password to `rootpw`, create a MySQL user named `domjudge` with password `djpw` and create an empty database named `domjudge`. It will also expose the server on port `13306` on your local machine, so you can use your favorite MySQL GUI to connect to it. If you want to save the MySQL data after removing the container, please read the [MariaDB](https://hub.docker.com/r/_/mariadb/) Docker Hub page for more information.
@@ -47,10 +78,10 @@ This will start a MariaDB container, set the root password to `rootpw`, create a
 
 Next, if you are on Linux make sure you have cgroups enabled. See the [DOMjudge documentation about setting up a judgehost](https://www.domjudge.org/docs/manual/master/install-judgehost.html#linux-control-groups) for information about how to do this. Docker on Windows and macOS actually use a small Linux VM which already has these options set.
 
-Now you can run the domserver using the following command:
+Without the optional Traefik reverse proxy, you can run the domserver using the following command:
 
 ```bash
-docker run --link dj-mariadb:mariadb -it -e MYSQL_HOST=mariadb -e MYSQL_USER=domjudge -e MYSQL_DATABASE=domjudge -e MYSQL_PASSWORD=djpw -e MYSQL_ROOT_PASSWORD=rootpw -p 12345:80 --name domserver domjudge/domserver:latest
+docker run -it --name domserver --net dj -e MYSQL_HOST=dj-mariadb -e MYSQL_USER=domjudge -e MYSQL_DATABASE=domjudge -e MYSQL_PASSWORD=djpw -e MYSQL_ROOT_PASSWORD=rootpw -p 12345:80 domjudge/domserver:latest
 ```
 
 If you want a specific DOMjudge version instead of the latest, replace `latest` with the DOMjudge version (e.g. `5.3.0`).
@@ -70,12 +101,32 @@ If you lose access to the admin user, see the [DOMjudge documentation on resetti
 
 Make a note of the password for the `judgehost` user, it will be used when the judgehost container is configured. The password can be changed from the web interface by editing the `judgehost` user.
 
+For a deployment using the Traefik container with ACME on domain `domjudge.example.com`, run domserver using the following command:
+
+```bash
+docker create -it --name domserver --net dj -e MYSQL_HOST=dj-mariadb -e MYSQL_USER=domjudge -e MYSQL_DATABASE=domjudge -e MYSQL_PASSWORD=djpw -e MYSQL_ROOT_PASSWORD=rootpw \
+  -l "traefik.enable=true" \
+  -l "traefik.http.services.domjudge.loadbalancer.server.port=80" \
+  -l "traefik.http.routers.domjudge.rule=Host(\`domjudge.example.com\`)" \
+  -l "traefik.http.routers.domjudge.entrypoints=web" \
+  -l "traefik.http.routers.domjudgesecure.rule=Host(\`domjudge.example.com\`)" \
+  -l "traefik.http.routers.domjudgesecure.entrypoints=websecure" \
+  -l "traefik.http.routers.domjudgesecure.tls=true" \
+  -l "traefik.http.routers.domjudgesecure.tls.certresolver=myresolver" \
+  -l "traefik.docker.network=proxy_network" \
+  domjudge/domserver:latest
+docker network connect proxy_network domserver
+docker start -a domserver
+```
+
+With DNS configured, you can now access the web interface on [http://domjudge.example.com/](http://domjudge.example.com/) or [https://domjudge.example.com/](https://domjudge.example.com/) and log in as admin.
+
 #### Environment variables
 
 The following environment variables are supported by the `domserver` container:
 
 * `CONTAINER_TIMEZONE` (defaults to `Europe/Amsterdam`): allows you to change the timezone used inside the container.
-* `MYSQL_HOST` (defaults to `mariadb`): set the host to connect to for MySQL. Can be hostname or IP. Docker will add hostnames for any containers you `--link`, so in the example above, the MariaDB container will be available under the hostname `mariadb`.
+* `MYSQL_HOST` (defaults to `mariadb`): set the host to connect to for MySQL. Can be hostname or IP.
 * `MYSQL_USER` (defaults to `domjudge`): set the user to use for connecting to MySQL.
 * `MYSQL_PASSWORD` (defaults to `domjudge`): set the password to use for connecting to MySQL.
 * `MYSQL_ROOT_PASSWORD` (defaults to `domjudge`): set the root password to use for connecting to MySQL.
@@ -130,13 +181,14 @@ where `[service]` is one of `nginx` or `php`.
 
 #### Docker-compose
 See https://github.com/DOMjudge/domjudge-packaging/blob/main/docker/docker-compose.yml for a docker-compose example which automates the steps above.
+When using the optional Traefik reverse proxy, deploy the stack defined in https://github.com/DOMjudge/domjudge-packaging/blob/main/docker/docker-compose-traefik.yml first and uncomment the relevant lines in the `docker-compose.yml` file.
 
 ### Judgehost container
 
 To run a single judgehost, run the following command:
 
 ```bash
-docker run -it --privileged -v /sys/fs/cgroup:/sys/fs/cgroup:ro --name judgehost-0 --link domserver:domserver --hostname judgedaemon-0 -e DAEMON_ID=0 domjudge/judgehost:latest
+docker run -it --privileged -v /sys/fs/cgroup:/sys/fs/cgroup --name judgehost-0 --net dj --hostname judgedaemon-0 -e DAEMON_ID=0 domjudge/judgehost:latest
 ```
 
 Again, replace `latest` with a specific version if desired. Make sure the version matches the version of the domserver.
@@ -190,7 +242,7 @@ echo 127.0.0.1 $(hostname) | sudo tee -a /etc/hosts
 
 ###################################################
 # Fill in these (secret) variables yourself!!
-sudo docker run -d --restart=on-failure --network host --privileged -v /sys/fs/cgroup:/sys/fs/cgroup:ro --name judgehost -e DOMSERVER_BASEURL=your_baseurl -e JUDGEDAEMON_USERNAME=your_username -e JUDGEDAEMON_PASSWORD=your_password domjudge/judgehost:7.0.3
+sudo docker run -d --restart=on-failure --network host --privileged -v /sys/fs/cgroup:/sys/fs/cgroup --name judgehost -e DOMSERVER_BASEURL=your_baseurl -e JUDGEDAEMON_USERNAME=your_username -e JUDGEDAEMON_PASSWORD=your_password domjudge/judgehost:7.0.3
 ###################################################
 
 # Enable cgroup functionality that judgehost needs, this requires a reboot
