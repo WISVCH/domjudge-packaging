@@ -1,7 +1,7 @@
 apt-get update
 apt-get install software-properties-common gnupg
 
-echo "deb [trusted=yes] https://wisvch.github.io/chipcie-repo/debian ." >> /etc/apt/sources.list
+echo "deb [trusted=yes] https://wisvch.github.io/chipcie-repo/debian ./" >> /etc/apt/sources.list
 echo 'Acquire::wisvch.github.io::Verify-Peer "false";
 Acquire::https::wisvch.github.io::Verify-Host "false";' >> /etc/apt/apt.conf.d/80trust-baylor-mirror
 
