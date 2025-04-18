@@ -10,7 +10,7 @@ RUN apt-get update \
 	gcc g++ make acl zip unzip \
 	php-cli php-zip \
 	php-gd php-curl php-mysql php-json php-intl \
-	php-gmp php-xml php-mbstring \
+	php-gmp php-xml php-mbstring php-bcmath \
 	sudo bsdmainutils ntp libcgroup-dev procps \
 	python3-venv python3-yaml fontconfig \
 	texlive-latex-recommended texlive-latex-extra \
@@ -65,7 +65,7 @@ RUN apt-get update \
 	acl curl zip unzip supervisor mariadb-client apache2-utils \
 	nginx php-cli php-fpm php-zip \
 	php-gd php-curl php-mysql php-json php-intl \
-	php-gmp php-xml php-mbstring php-ldap \
+	php-gmp php-xml php-mbstring php-ldap php-bcmath \
 	enscript \
 	printer-driver-all cups cups-pdf cups-client cups-bsd cups-filters \
 	ca-certificates python3-yaml python3-requests \

@@ -19,7 +19,7 @@ RUN apt update \
 	dumb-init \
 	acl zip unzip supervisor sudo procps libcgroup-dev \
 	php-cli php-zip php-gd php-curl php-mysql php-json \
-	php-gmp php-xml php-mbstring python3 \
+	php-gmp php-xml php-mbstring php-bcmath python3 \
 	gcc g++ openjdk-21-jre-headless openjdk-21-jdk-headless ghc fp-compiler \
 	&& rm -rf /var/lib/apt/lists/*
 
@@ -28,7 +28,7 @@ COPY judgehost/add_repositories.sh /add_repositories.sh
 RUN chmod 700 /add_repositories.sh && /add_repositories.sh && rm -f /add_repositories.sh
 RUN apt update \
 	&& apt install --no-install-recommends --no-install-suggests -y \
-	openjdk-17-jre-headless openjdk-17-jdk-headless pypy3 icpc-kotlinc \
+	openjdk-17-jre-headless openjdk-17-jdk-headless pypy3 chipcie-kotlin \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Add chroot and judgehost data
