@@ -26,6 +26,8 @@ for category in list_doc:
         for item in category["items"]:
             if item["name"] == "show_affiliation_logos":
                  item["default_value"] = True
+            if item["name"] == "show_balloons_postfreeze":
+                 item["default_value"] = True
 
 with open(config, "w") as f:
     yaml.dump(list_doc, f)
