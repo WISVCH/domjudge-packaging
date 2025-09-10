@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
-cp /scripts/patches.d/multipass.patch /domjudge-src
-cd /domjudge-src
-cd */.
+cp /scripts/multipass.patch /domjudge-src
+cd /domjudge-src/domjudge*
 git apply ../multipass.patch
 
 
