@@ -10,7 +10,7 @@ with open(user_fixture_php, "r") as f:
 
 for i in range(len(lines)):
     if lines[i] == "                ->setUsername('admin')\n":
-        lines[i] = "                ->setUsername('admin')->setTeam($this->getReference(TeamFixture::DOMJUDGE_REFERENCE))\n"
+        lines[i] = "                ->setUsername('admin')->setTeam($this->getReference(TeamFixture::DOMJUDGE_REFERENCE, Team::class))\n"
         break
 else:
     print(f"Couldn't find admin line in {user_fixture_php}")
