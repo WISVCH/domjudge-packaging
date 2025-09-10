@@ -37,6 +37,9 @@ COPY domserver/build.sh /domjudge-src/build.sh
 # Apply patches
 COPY domserver/scripts/patches.sh /scripts/patches.sh
 COPY domserver/scripts/patches.d /scripts/patches.d
+
+COPY domserver/scripts/multipass.patch /scripts/multipass.patch
+
 RUN chmod 700 /scripts/patches.sh && /scripts/patches.sh
 
 # Build and install domserver
