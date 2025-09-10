@@ -31,6 +31,12 @@ RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
 ADD domjudge.tar.gz /domjudge-src
 ADD judgehost/build.sh /domjudge-src
 
+# Apply patches
+COPY judgehost/scripts/patches.sh /scripts/patches.sh
+COPY judgehost/scripts/patches.d /scripts/patches.d
+COPY judgehost/scripts/multipass.patch /scripts/multipass.patch
+RUN chmod 700 /scripts/patches.sh && /scripts/patches.sh
+
 # Build and install judgehost
 RUN /domjudge-src/build.sh
 
