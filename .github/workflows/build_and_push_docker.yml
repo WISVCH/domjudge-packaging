@@ -10,7 +10,6 @@ on:
       version:
         required: false
         description: 'Select which branch/version of DOMjudge/DOMjudge to use'
-        default: 'main'
 
 env:
   REGISTRY: ghcr.io
