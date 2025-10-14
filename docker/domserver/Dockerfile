@@ -8,7 +8,7 @@ RUN apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y \
 	autoconf automake git pkg-config \
 	gcc g++ make acl zip unzip \
-	php-cli php-zip \
+	php-cli php-zip php-bcmath \
 	php-gd php-curl php-mysql php-json php-intl \
 	php-gmp php-xml php-mbstring php-bcmath \
 	sudo bsdmainutils ntp libcgroup-dev procps \
@@ -62,8 +62,8 @@ RUN useradd -m domjudge
 # Install required packages for running of domserver
 RUN apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y \
-	acl curl zip unzip supervisor mariadb-client apache2-utils \
-	nginx php-cli php-fpm php-zip \
+	acl curl zip unzip supervisor mariadb-client pv apache2-utils \
+	nginx php-cli php-fpm php-zip php-bcmath \
 	php-gd php-curl php-mysql php-json php-intl \
 	php-gmp php-xml php-mbstring php-ldap php-bcmath \
 	enscript \
