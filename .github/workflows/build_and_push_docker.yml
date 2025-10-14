@@ -10,6 +10,7 @@ on:
       version:
         required: false
         description: 'Select which branch/version of DOMjudge/DOMjudge to use'
+        # default: 'main' 
 
 env:
   REGISTRY: ghcr.io
@@ -34,16 +35,20 @@ jobs:
           DOCKER_TAGS=( "latest" )
           DOCKER_TAGS+=( "packaging-$(git rev-parse --short HEAD)" )
 
-          DJ_TAGS=$(curl -s https://api.github.com/repos/${REPO}/git/refs/tags | jq 'reverse | ((.[].ref) / "refs/tags/" )[1]' | rev | cut -c2- | rev | cut -c2-)
+          echo "Trying to find matching tag"
+
+          DJ_TAGS=$(curl -s https://api.github.com/repos/${REPO}/git/refs/tags | jq 'reverse | ((.[].ref) / "refs/tags/" )[1]'  | rev | cut -c2- | rev | cut -c2- | grep -E '^[0-9]+\.[0-9]+\.[0-9]+([-.].*)?$')
           RELEASE_VERSION=$(echo "${DJ_TAGS}" | head -n 1)
           TAG_TO_BUILD=""
 
           if [[ "$INPUT_VERSION" == "" || "$INPUT_VERSION" == "release" || "$INPUT_VERSION" == "$RELEASE_VERSION" ]]; then
+            echo "Building highest version tag $RELEASE_VERSION"
             TAG_TO_BUILD=$RELEASE_VERSION
             DOCKER_TAGS+=( "$RELEASE_VERSION" )
           fi
 
           if [[ "$TAG_TO_BUILD" == "" ]] && echo "$DJ_TAGS" | grep -F -q -x "$INPUT_VERSION"; then
+            echo "Building matching version tag $RELEASE_VERSION"
             TAG_TO_BUILD=$INPUT_VERSION
             DOCKER_TAGS+=( "$INPUT_VERSION" )
           fi
@@ -56,10 +61,13 @@ jobs:
             exit 0
           fi
 
+          echo "Trying to find matching branch"
+
           DJ_BRANCHES=$(curl -s https://api.github.com/repos/${REPO}/branches?per_page=100 | jq '.[].name' | rev | cut -c2- | rev | cut -c2-)
           BRANCH_TO_BUILD=""
 
           if [[ "$BRANCH_TO_BUILD" == "" ]] && echo "$DJ_BRANCHES" | grep -F -q -x "$INPUT_VERSION"; then
+            echo "Found matching branch $INPUT_VERSION"
             BRANCH_TO_BUILD=$INPUT_VERSION
             DOCKER_TAGS+=( "$INPUT_VERSION" )
           fi
@@ -76,6 +84,7 @@ jobs:
           COMMIT_TO_BUILD=""
 
           if [[ "$COMMIT_TO_BUILD" == "" ]] && echo "$DJ_COMMITS" | grep -F -q -x "$INPUT_VERSION"; then
+            echo "Found matching commit $INPUT_VERSION"
             COMMIT_TO_BUILD=$INPUT_VERSION
             DOCKER_TAGS+=( "$INPUT_VERSION" )
           fi
