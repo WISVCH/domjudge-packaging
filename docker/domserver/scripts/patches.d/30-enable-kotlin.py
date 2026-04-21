@@ -12,9 +12,9 @@ with open(language_fixture_php, "r") as f:
 for i in range(len(lines)):
     elements = lines[i].split(',')
 
-    if len(elements) >= 10 and elements[6].strip().lower() == 'false':
-        if 'kt' in elements[0]:
-            elements[6] = 'true'
+    if len(elements) >= 10 and elements[5].strip().lower() == 'false':
+        if 'kotlin' in elements[0]:
+            elements[5] = 'true'
 
             lines[i] = ','.join(elements)
             break
