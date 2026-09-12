@@ -31,7 +31,10 @@ alongside `docker-nix/judgehost/` as build context):
 
 This produces `<namespace>/judgehost-nix:<version>`, a drop-in judgehost
 image whose chroot's gcc/g++, JDK 21, PyPy3, Kotlin, GHC, and Free Pascal
-come from the pinned nixpkgs revision in `flake.lock`.
+come from the pinned nixpkgs revision in `flake.lock`. CI builds and
+publishes it to `ghcr.io/<repo>/judgehost-nix` alongside the regular
+`domserver`/`judgehost` images (see `build_judgehost_nix` in
+`.github/workflows/build_and_push_docker.yml`).
 
 ## How it works
 
@@ -39,11 +42,18 @@ come from the pinned nixpkgs revision in `flake.lock`.
 bootstrap the base Ubuntu chroot, but removes the compilers it installs by
 default (`-r gcc,g++,make,default-jdk-headless,default-jre-headless,pypy3`)
 so nothing but the Nix-built toolchains ends up on the chroot's `PATH`.
-`install-nix-toolchains.sh` then builds `flake#judgehostToolchains` and
-copies its full closure straight into the chroot's filesystem at the
-matching `/nix/store/<hash>` paths, symlinking its `bin/` entries into
+`install-nix-toolchains.sh` then builds each of the flake's language
+packages (`gcc`, `openjdk21`, `pypy3`, `kotlin`, `ghc`, `fpc`) and copies
+their full closures straight into the chroot's filesystem at the matching
+`/nix/store/<hash>` paths, symlinking each package's `bin/` entries into
 `/usr/local/bin` inside the chroot. Nix store paths are content-addressed
 and self-contained (compiled binaries reference their dependencies by
 absolute `/nix/store/...` path), so no Nix daemon, database, or host
 bind-mount is needed inside the chroot at judge time - only the files
 themselves need to be present.
+
+The packages are merged onto the chroot's `PATH` with a plain shell glob
+over each package's own `bin/`, not Nix's `symlinkJoin`: `symlinkJoin`
+turned out to silently drop `openjdk`'s binaries (`java`, `javac`, ...)
+because its `bin` is a symlink to `lib/openjdk/bin` rather than a plain
+directory, which its directory-merge logic doesn't handle.
