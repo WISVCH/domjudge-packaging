@@ -1,0 +1,59 @@
+FROM ubuntu:24.04
+LABEL org.opencontainers.image.authors="DOMjudge team <team@domjudge.org>"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+COPY docker-nix/judgehost/add_repositories.sh /scripts/add_repositories.sh
+
+# Install required packages for build of judgehost, plus curl/xz-utils to
+# install Nix below (Nix builds the chroot's language toolchains instead of
+# apt - see chroot-and-tar.sh and install-nix-toolchains.sh).
+RUN apt-get update \
+	&& apt-get install --no-install-recommends --no-install-suggests -y \
+	autoconf automake git pkg-config \
+	gcc g++ make zip unzip \
+	php-cli php-zip lsb-release debootstrap \
+	php-gd php-curl php-mysql php-json \
+	php-gmp php-xml php-bcmath php-mbstring \
+	sudo bsdmainutils ntp libcgroup-dev procps \
+	libcurl4-gnutls-dev libjsoncpp-dev libmagic-dev \
+	ca-certificates curl xz-utils \
+	&& rm -rf /var/lib/apt/lists/*
+
+# Set up user
+RUN useradd -m domjudge
+
+# Install composer
+
+RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
+	&& php composer-setup.php \
+	&& mv /composer.phar /usr/local/bin/composer
+
+# Install Nix (single-user mode: no systemd/daemon is running in this build
+# container, and this image only ever runs as root anyway).
+RUN curl -L https://nixos.org/nix/install -o /tmp/install-nix.sh \
+	&& sh /tmp/install-nix.sh --no-daemon \
+	&& rm /tmp/install-nix.sh
+ENV PATH="/root/.nix-profile/bin:${PATH}"
+
+# The flake that pins the judgehost's language toolchain versions - kept at
+# the repo root so icpc-nix can later import it and follow its own nixpkgs
+# pin, guaranteeing both images build the exact same toolchain versions.
+COPY flake.nix flake.lock /flake/
+
+# Add DOMjudge source code and build script
+ADD domjudge.tar.gz /domjudge-src
+ADD docker-nix/judgehost/build.sh /domjudge-src
+
+# Apply patches
+COPY docker-nix/judgehost/scripts/patches.sh /scripts/patches.sh
+COPY docker-nix/judgehost/scripts/patches.d /scripts/patches.d
+COPY docker-nix/judgehost/scripts/multipass.patch /scripts/multipass.patch
+RUN chmod 700 /scripts/patches.sh && /scripts/patches.sh
+
+# Build and install judgehost
+RUN /domjudge-src/build.sh
+
+# We need to mount proc, which is not possible in "docker build". Thus we need to run this when starting the container
+COPY ["docker-nix/judgehost/chroot-and-tar.sh", "docker-nix/judgehost/install-nix-toolchains.sh", "/scripts/"]
+CMD ["/scripts/chroot-and-tar.sh"]
