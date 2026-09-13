@@ -10,14 +10,12 @@ with open(language_fixture_php, "r") as f:
      lines = f.readlines()
 
 for i in range(len(lines)):
-    elements = lines[i].split(',')
-
-    if len(elements) >= 10 and elements[5].strip().lower() == 'false':
-        if 'kotlin' in elements[0]:
-            elements[5] = 'true'
-
-            lines[i] = ','.join(elements)
-            break
+    line = lines[i]
+    if line.startswith("            [") and "kotlin" in line:
+        lines[i] = line.replace("false", "true")
+        print("Patching Kotlin line to:")
+        print(lines[i].rstrip())
+        break
 else:
     print(f"Couldn't find kotlin line in {language_fixture_php}")
     exit(1)
