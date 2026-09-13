@@ -1,3 +1,19 @@
+# Build the judgehost's language toolchains with Nix in their own stage.
+# Nix's official installer refuses to set up a working single-user install
+# as root ("the group 'nixbld' specified in 'build-users-group' does not
+# exist"), which is what the later Ubuntu-based stage would be. The nixos/nix
+# image already has a correctly configured Nix as root, so build there and
+# copy the plain output files into the Ubuntu stage instead of trying to
+# install Nix itself into it.
+FROM nixos/nix:2.35.2 AS nix-toolchains
+COPY flake.nix flake.lock /flake/
+RUN mkdir -p /toolchains \
+	&& for pkg in gcc openjdk21 pypy3 kotlin ghc fpc; do \
+		out=$(nix --extra-experimental-features 'nix-command flakes' build --print-out-paths --no-link "/flake#${pkg}") \
+		&& nix-store --query --requisites "$out" | xargs cp -a --parents --target-directory=/toolchains \
+		&& echo "$out" >> /toolchains-outputs.txt; \
+	done
+
 FROM ubuntu:24.04
 LABEL org.opencontainers.image.authors="DOMjudge team <team@domjudge.org>"
 
@@ -5,9 +21,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 COPY docker-nix/judgehost/add_repositories.sh /scripts/add_repositories.sh
 
-# Install required packages for build of judgehost, plus curl/xz-utils to
-# install Nix below (Nix builds the chroot's language toolchains instead of
-# apt - see chroot-and-tar.sh and install-nix-toolchains.sh).
+# Install required packages for build of judgehost
 RUN apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y \
 	autoconf automake git pkg-config \
@@ -17,7 +31,7 @@ RUN apt-get update \
 	php-gmp php-xml php-bcmath php-mbstring \
 	sudo bsdmainutils ntp libcgroup-dev procps \
 	libcurl4-gnutls-dev libjsoncpp-dev libmagic-dev \
-	ca-certificates curl xz-utils \
+	ca-certificates \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Set up user
@@ -29,17 +43,12 @@ RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
 	&& php composer-setup.php \
 	&& mv /composer.phar /usr/local/bin/composer
 
-# Install Nix (single-user mode: no systemd/daemon is running in this build
-# container, and this image only ever runs as root anyway).
-RUN curl -L https://nixos.org/nix/install -o /tmp/install-nix.sh \
-	&& sh /tmp/install-nix.sh --no-daemon \
-	&& rm /tmp/install-nix.sh
-ENV PATH="/root/.nix-profile/bin:${PATH}"
-
-# The flake that pins the judgehost's language toolchain versions - kept at
-# the repo root so icpc-nix can later import it and follow its own nixpkgs
-# pin, guaranteeing both images build the exact same toolchain versions.
-COPY flake.nix flake.lock /flake/
+# Pre-built Nix closure for the chroot's language toolchains (see the
+# nix-toolchains stage above) - baked in at image build time, so
+# install-nix-toolchains.sh only has to copy plain files into the chroot at
+# container run time. No Nix install/daemon is needed in this image at all.
+COPY --from=nix-toolchains /toolchains /nix-toolchains
+COPY --from=nix-toolchains /toolchains-outputs.txt /nix-toolchains-outputs.txt
 
 # Add DOMjudge source code and build script
 ADD domjudge.tar.gz /domjudge-src
