@@ -134,7 +134,7 @@ jobs:
       - name: Build container
         run: |
           cd ./docker
-          sudo bash -e ./build-domjudge.sh "domjudge/domserver:chipcie"
+          sudo bash -e ./build-domserver.sh "domjudge/domserver:chipcie"
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
