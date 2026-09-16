@@ -57,7 +57,7 @@ RUN apt-get update \
 	nginx composer php-fpm php-zip php-bcmath \
 	php-ds php-gd php-mysql php-json php-intl php-gmp \
 	php-xml php-mbstring python3-yaml python3-requests enscript lpr \
-	printer-driver-all cups cups-pdf cups-client cups-bsd cups-filters \
+	printer-driver-all cups cups-pdf cups-client cups-filters \
 	ca-certificates \
 	vim wget \
 	&& rm -rf /var/lib/apt/lists/*
