@@ -4,6 +4,10 @@
   closureInfo,
   bash,
   coreutils,
+  findutils,
+  gawk,
+  gnugrep,
+  gnused,
   toolchains,
 }:
 
@@ -28,6 +32,12 @@ let
   rootPaths = toolchains ++ [
     bash
     coreutils
+    # DOMjudge's per-language build/run scripts are shell, and several of
+    # them (java's main-class detection, kotlin's) use these.
+    findutils
+    gawk
+    gnugrep
+    gnused
   ];
 in
 stdenvNoCC.mkDerivation {

@@ -8,11 +8,15 @@
   bash,
   cacert,
   coreutils,
+  diffutils,
   dumb-init,
   findutils,
+  gawk,
   gnugrep,
   gnused,
   gzip,
+  lsof,
+  nettools,
   procps,
   shadow,
   sudo,
@@ -44,10 +48,18 @@ let
   runtimeInputs = [
     bash
     coreutils
+    # DOMjudge's judging scripts shell out to all of these: create_cgroups
+    # to awk, check_diff.sh to diff, compile.sh/testcase_run.sh to hostname
+    # for their log file names, chroot-startstop.sh to lsof when a umount
+    # fails.
+    diffutils
     findutils
+    gawk
     gnugrep
     gnused
     gzip
+    lsof
+    nettools
     procps
     shadow
     sudo
