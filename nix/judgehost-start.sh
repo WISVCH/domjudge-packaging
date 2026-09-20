@@ -37,6 +37,11 @@ printf 'default\t%sapi/v4\t%s\t%s\n' \
 chown domjudge: etc/restapi.secret
 chmod 600 etc/restapi.secret
 
+# Picks up any .crt an operator (or a test) dropped in before starting the
+# container; docker cp + update-ca-certificates after start still works too.
+echo "[..] Refreshing CA certificates"
+update-ca-certificates
+
 echo "[..] Setting up cgroups"
 bin/create_cgroups
 
@@ -48,6 +53,10 @@ if ! id "domjudge-run-${DAEMON_ID}" >/dev/null 2>&1; then
 fi
 
 echo "[ok] Starting judgedaemon ${DAEMON_ID}"
+# SSL_CERT_FILE explicitly as well as through sudoers' env_keep: judgedaemon
+# reaches the API over HTTPS through PHP's curl, which resolves the chain
+# with OpenSSL.
 exec sudo -u domjudge \
 	DOMJUDGE_CREATE_WRITABLE_TEMP_DIR="${DOMJUDGE_CREATE_WRITABLE_TEMP_DIR}" \
+	SSL_CERT_FILE="${SSL_CERT_FILE}" \
 	/opt/domjudge/judgehost/bin/judgedaemon -n "${DAEMON_ID}"

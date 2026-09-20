@@ -6,6 +6,7 @@
   writeShellApplication,
   writeText,
   bash,
+  cacert,
   coreutils,
   dumb-init,
   findutils,
@@ -55,9 +56,35 @@ let
     zip
   ];
 
+  # DOMjudge judges over HTTPS, and a contest's domserver often has a
+  # private CA. The apt image inherited Debian's way of adding one - drop a
+  # .crt into /usr/local/share/ca-certificates and run update-ca-certificates
+  # - which icpc-playbooks and icpc-nix's console test both use, so this
+  # image provides the same two things rather than a Nix-only convention.
+  #
+  # PHP's curl (judgedaemon talks to the API through it) reads the bundle
+  # through OpenSSL, which honours SSL_CERT_FILE and the path below.
+  caBundle = "/etc/ssl/certs/ca-certificates.crt";
+
+  updateCaCertificates = writeShellApplication {
+    name = "update-ca-certificates";
+    runtimeInputs = [ coreutils ];
+    text = ''
+      mkdir -p "$(dirname ${caBundle})" /usr/local/share/ca-certificates
+      # Rebuilt from scratch, so removing a .crt and running this again
+      # really removes it.
+      cat ${cacert}/etc/ssl/certs/ca-bundle.crt > ${caBundle}
+      for crt in /usr/local/share/ca-certificates/*.crt; do
+        [ -e "$crt" ] || continue
+        echo "[..] Adding $crt"
+        cat "$crt" >> ${caBundle}
+      done
+    '';
+  };
+
   start = writeShellApplication {
     name = "judgehost-start";
-    runtimeInputs = runtimeInputs ++ [ domjudge-judgehost ];
+    runtimeInputs = runtimeInputs ++ [ updateCaCertificates ];
     text = builtins.readFile ./judgehost-start.sh;
   };
 
@@ -66,6 +93,19 @@ let
   # the packages above are linked into /bin, so its own file is used as-is.
   sudoers = writeText "sudoers" ''
     root ALL=(ALL:ALL) SETENV: ALL
+
+    # judgedaemon runs under sudo, and everything it shells out to - including
+    # its own `sudo -n mount`, which /etc/sudoers.d/domjudge allows by
+    # /bin path - has to stay findable. sudo would otherwise replace PATH
+    # with its compiled-in default, which has neither /bin nor DOMjudge's
+    # own bin directory.
+    Defaults secure_path="/usr/bin:/bin:/opt/domjudge/judgehost/bin"
+
+    # PHP's curl resolves the domserver's certificate through OpenSSL, which
+    # reads this; without it env_reset drops the CA bundle on the way to
+    # judgedaemon and a private CA stops being trusted.
+    Defaults env_keep += "SSL_CERT_FILE"
+
     @includedir /etc/sudoers.d
   '';
 in
@@ -75,12 +115,14 @@ dockerTools.buildLayeredImage {
   contents = runtimeInputs ++ [
     chrootLink
     start
+    updateCaCertificates
     dumb-init
   ];
 
   enableFakechroot = true;
   fakeRootCommands = ''
-    mkdir -p /etc/sudoers.d /usr/bin /tmp /var/log
+    mkdir -p /etc/sudoers.d /usr/bin /tmp /var/log \
+      /usr/local/share/ca-certificates /etc/ssl/certs
     chmod 1777 /tmp
 
     # Some of these paths are already symlinks into the store (sudo ships
@@ -129,6 +171,7 @@ dockerTools.buildLayeredImage {
     chmod -R u+w /opt/domjudge/judgehost
 
     ln -sfn ${tzdata}/share/zoneinfo /etc/zoneinfo
+    cat ${cacert}/etc/ssl/certs/ca-bundle.crt > ${caBundle}
 
     # Everything created above belongs to root: these commands run as the
     # Nix build user, and a layer owned by another uid needs a subuid range
@@ -146,6 +189,7 @@ dockerTools.buildLayeredImage {
     Env = [
       # /usr/bin first for the setuid sudo; everything else is in /bin.
       "PATH=/usr/bin:/bin:/opt/domjudge/judgehost/bin"
+      "SSL_CERT_FILE=${caBundle}"
       "CONTAINER_TIMEZONE=Europe/Amsterdam"
       "DOMSERVER_BASEURL=http://domserver/"
       "JUDGEDAEMON_USERNAME=judgehost"
