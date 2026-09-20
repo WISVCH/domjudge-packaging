@@ -55,10 +55,21 @@ in `judge/chroot-startstop.sh.in`. Without it a judging sees the symlinks in
 `/usr/bin` and nothing they point at. This is worth proposing upstream as a
 configurable list.
 
-**The chroot's closure is copied, with references discarded.** `chroot.nix`
-copies the closure to its own `nix/store` and sets `unsafeDiscardReferences`,
-so the image carries the toolchains once rather than twice. The copy is
-self-contained: everything it needs is beneath it.
+**The toolchains are in the image twice, on purpose.** `chroot.nix` copies
+the closure into the chroot's own `nix/store` *and* keeps it as a reference,
+so the same store paths exist in the container as well.
+
+DOMjudge builds an output validator inside the chroot but runs it outside
+(`testcase_run.sh`'s compare call has no `-r`). A validator compiled by the
+chroot's `g++` therefore needs its ELF interpreter and libstdc++ - which are
+`/nix/store` paths - present in the container too. With the apt image both
+sides were Ubuntu and shared `/lib/x86_64-linux-gnu`, so it never came up;
+here, discarding the references made every judging fail with `cannot start
+... No such file or directory`.
+
+The copy still earns its place: it is all a judging can reach, so judged
+code never sees the judgehost's own PHP, shell and sudo. The cost is image
+size, roughly 1.7 GiB compressed rather than 1.0.
 
 ## Testing
 
