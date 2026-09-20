@@ -121,7 +121,7 @@ let
     # PHP's curl resolves the domserver's certificate through OpenSSL, which
     # reads this; without it env_reset drops the CA bundle on the way to
     # judgedaemon and a private CA stops being trusted.
-    Defaults env_keep += "SSL_CERT_FILE"
+    Defaults env_keep += "SSL_CERT_FILE NIX_SSL_CERT_FILE"
 
     @includedir /etc/sudoers.d
   '';
@@ -223,7 +223,12 @@ dockerTools.buildLayeredImage {
     Env = [
       # /usr/bin first for the setuid sudo; everything else is in /bin.
       "PATH=/usr/bin:/bin:/opt/domjudge/judgehost/bin"
+      # nixpkgs' curl is built --without-ca-bundle --with-ca-fallback, so it
+      # has no compiled-in CA path and falls back to OpenSSL's defaults,
+      # which read these. NIX_SSL_CERT_FILE as well: nixpkgs patches openssl
+      # to prefer it.
       "SSL_CERT_FILE=${caBundle}"
+      "NIX_SSL_CERT_FILE=${caBundle}"
       "CONTAINER_TIMEZONE=Europe/Amsterdam"
       "DOMSERVER_BASEURL=http://domserver/"
       "JUDGEDAEMON_USERNAME=judgehost"

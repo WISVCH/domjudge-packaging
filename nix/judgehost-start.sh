@@ -59,4 +59,5 @@ echo "[ok] Starting judgedaemon ${DAEMON_ID}"
 exec sudo -u domjudge \
 	DOMJUDGE_CREATE_WRITABLE_TEMP_DIR="${DOMJUDGE_CREATE_WRITABLE_TEMP_DIR}" \
 	SSL_CERT_FILE="${SSL_CERT_FILE}" \
+	NIX_SSL_CERT_FILE="${NIX_SSL_CERT_FILE}" \
 	/opt/domjudge/judgehost/bin/judgedaemon -n "${DAEMON_ID}"
