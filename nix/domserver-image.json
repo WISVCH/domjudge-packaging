@@ -1,0 +1,7 @@
+{
+  "_comment": "Written by the build_domserver CI job after it pushes, so one input bump moves a consumer's domserver and judgehost together. Until that job has run for the version in domjudge.json, this is the image that was pinned by hand - its tag says which build it is, not which DOMjudge nix/domjudge.json asks for.",
+  "imageName": "ghcr.io/wisvch/domjudge-packaging/domserver",
+  "finalImageTag": "packaging-e8150e1",
+  "imageDigest": "sha256:00b90f5e84b04aeb2cad4ed27a61e64c624c771a2687badfd5e1b09e3fc08a46",
+  "sha256": "sha256-DmYsEara2YM++kz60qfuCwkXZRrBwW7tcajYK5Sc+yE="
+}
