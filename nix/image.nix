@@ -1,0 +1,163 @@
+{
+  lib,
+  pkgs,
+  dockerTools,
+  runCommand,
+  writeShellApplication,
+  writeText,
+  bash,
+  coreutils,
+  dumb-init,
+  findutils,
+  gnugrep,
+  gnused,
+  gzip,
+  procps,
+  shadow,
+  sudo,
+  tzdata,
+  unzip,
+  util-linux,
+  zip,
+  domjudge-judgehost,
+  chroot,
+  name ? "judgehost-nix",
+  tag ? "latest",
+}:
+
+# The judgehost container image, built entirely by Nix: no Ubuntu base, no
+# apt, and no debootstrap when it starts. DOMjudge still lives at
+# /opt/domjudge, so anything driving a judgehost (icpc-playbooks, the
+# docker-compose files here) sees the same layout as the apt image.
+let
+  # The chroot is referenced, never copied: /chroot/domjudge is a symlink
+  # into the store, which chroot-startstop.sh follows happily. A copy would
+  # put its 1.5 GB in the image twice.
+  chrootLink = runCommand "judgehost-chroot-link" { } ''
+    mkdir -p $out/chroot
+    ln -s ${chroot} $out/chroot/domjudge
+  '';
+
+  # What judgedaemon and the judging scripts shell out to. The sudoers rules
+  # below name these by their /bin path, so they have to be reachable there.
+  runtimeInputs = [
+    bash
+    coreutils
+    findutils
+    gnugrep
+    gnused
+    gzip
+    procps
+    shadow
+    sudo
+    unzip
+    util-linux
+    zip
+  ];
+
+  start = writeShellApplication {
+    name = "judgehost-start";
+    runtimeInputs = runtimeInputs ++ [ domjudge-judgehost ];
+    text = builtins.readFile ./judgehost-start.sh;
+  };
+
+  # DOMjudge ships sudoers rules written against /bin/mount, /bin/cp and so
+  # on (etc/sudoers-domjudge.in). Those paths exist in this image because
+  # the packages above are linked into /bin, so its own file is used as-is.
+  sudoers = writeText "sudoers" ''
+    root ALL=(ALL:ALL) SETENV: ALL
+    @includedir /etc/sudoers.d
+  '';
+in
+dockerTools.buildLayeredImage {
+  inherit name tag;
+
+  contents = runtimeInputs ++ [
+    chrootLink
+    start
+    dumb-init
+  ];
+
+  enableFakechroot = true;
+  fakeRootCommands = ''
+    mkdir -p /etc/sudoers.d /usr/bin /tmp /var/log
+    chmod 1777 /tmp
+
+    # Some of these paths are already symlinks into the store (sudo ships
+    # its own /etc/sudoers), which cannot be written through.
+    rm -f /etc/sudoers /etc/passwd /etc/group /etc/shadow /etc/localtime
+
+    # judgedaemon refuses to run as root (judgedaemon.main.php), so it runs
+    # as domjudge and reaches root through sudo for runguard and the chroot
+    # mounts. domjudge-run-<id> is created at startup, once DAEMON_ID is
+    # known.
+    cat > /etc/passwd <<'EOF'
+    root:x:0:0:root:/root:/bin/bash
+    domjudge:x:1000:1000:DOMjudge:/opt/domjudge:/bin/bash
+    nobody:x:65534:65534:nobody:/nonexistent:/bin/false
+    EOF
+    cat > /etc/group <<'EOF'
+    root:x:0:
+    domjudge:x:1000:
+    nogroup:x:65534:
+    EOF
+    cat > /etc/shadow <<'EOF'
+    root:!:1::::::
+    domjudge:!:1::::::
+    EOF
+    chmod 600 /etc/shadow
+
+    # sudo refuses to run from a world-writable or non-root-owned file, and
+    # cannot be setuid inside the Nix store, so it is copied out of it.
+    cp ${sudo}/bin/sudo /usr/bin/sudo
+    chown 0:0 /usr/bin/sudo
+    chmod 4755 /usr/bin/sudo
+    cp ${sudoers} /etc/sudoers
+    cp ${domjudge-judgehost}/opt/domjudge/judgehost/etc/sudoers-domjudge /etc/sudoers.d/domjudge
+    chown 0:0 /etc/sudoers /etc/sudoers.d/domjudge
+    chmod 440 /etc/sudoers /etc/sudoers.d/domjudge
+
+    # /opt/domjudge is a writable copy, not a store symlink: judgedaemon
+    # writes etc/restapi.secret, judgings/ and log/ underneath it. It stays
+    # root-owned here and is chowned to domjudge at startup - a layer owned
+    # by uid 1000 cannot be unpacked by a rootless podman without a subuid
+    # range configured for it.
+    mkdir -p /opt/domjudge/judgehost
+    # Not cp -a: preserving the store's modes fails under proot here.
+    cp -r --no-preserve=mode,ownership \
+      ${domjudge-judgehost}/opt/domjudge/judgehost/. /opt/domjudge/judgehost/
+    chmod -R u+w /opt/domjudge/judgehost
+
+    ln -sfn ${tzdata}/share/zoneinfo /etc/zoneinfo
+
+    # Everything created above belongs to root: these commands run as the
+    # Nix build user, and a layer owned by another uid needs a subuid range
+    # to unpack under a rootless podman.
+    chown -Rh 0:0 /etc /opt /usr /tmp /var
+    chmod 4755 /usr/bin/sudo
+  '';
+
+  config = {
+    Entrypoint = [
+      "${dumb-init}/bin/dumb-init"
+      "--"
+    ];
+    Cmd = [ "${start}/bin/judgehost-start" ];
+    Env = [
+      # /usr/bin first for the setuid sudo; everything else is in /bin.
+      "PATH=/usr/bin:/bin:/opt/domjudge/judgehost/bin"
+      "CONTAINER_TIMEZONE=Europe/Amsterdam"
+      "DOMSERVER_BASEURL=http://domserver/"
+      "JUDGEDAEMON_USERNAME=judgehost"
+      "JUDGEDAEMON_PASSWORD=password"
+      "DAEMON_ID=0"
+      "DOMJUDGE_CREATE_WRITABLE_TEMP_DIR=0"
+      "RUN_USER_UID_GID=62860"
+    ];
+  };
+
+  passthru = {
+    inherit chroot domjudge-judgehost;
+    toolchains = chroot.toolchains;
+  };
+}

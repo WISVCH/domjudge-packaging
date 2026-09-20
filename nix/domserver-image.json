@@ -1,0 +1,7 @@
+{
+  "_comment": "Written by the build_domserver CI job after it pushes, so one input bump moves icpc-nix's domserver and judgehost together. imageDigest identifies the image built from nix/domjudge.json's version.",
+  "imageName": "ghcr.io/wisvch/domjudge-packaging/domserver",
+  "finalImageTag": "9.0.1",
+  "imageDigest": "sha256:00b90f5e84b04aeb2cad4ed27a61e64c624c771a2687badfd5e1b09e3fc08a46",
+  "sha256": "sha256-DmYsEara2YM++kz60qfuCwkXZRrBwW7tcajYK5Sc+yE="
+}
