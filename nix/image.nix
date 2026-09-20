@@ -17,6 +17,7 @@
   gzip,
   lsof,
   nettools,
+  pam,
   procps,
   shadow,
   sudo,
@@ -82,15 +83,19 @@ let
     name = "update-ca-certificates";
     runtimeInputs = [ coreutils ];
     text = ''
-      mkdir -p "$(dirname ${caBundle})" /usr/local/share/ca-certificates
-      # Rebuilt from scratch, so removing a .crt and running this again
-      # really removes it.
-      cat ${cacert}/etc/ssl/certs/ca-bundle.crt > ${caBundle}
-      for crt in /usr/local/share/ca-certificates/*.crt; do
-        [ -e "$crt" ] || continue
-        echo "[..] Adding $crt"
-        cat "$crt" >> ${caBundle}
-      done
+        mkdir -p "$(dirname ${caBundle})" /usr/local/share/ca-certificates
+        # Rebuilt from scratch, so removing a .crt and running this again
+        # really removes it.
+        cat ${cacert}/etc/ssl/certs/ca-bundle.crt > ${caBundle}
+
+      mkdir -p /etc/pam.d
+      cp ${pamSudo} /etc/pam.d/sudo
+      cp ${pamSudo} /etc/pam.d/other
+        for crt in /usr/local/share/ca-certificates/*.crt; do
+          [ -e "$crt" ] || continue
+          echo "[..] Adding $crt"
+          cat "$crt" >> ${caBundle}
+        done
     '';
   };
 
@@ -119,6 +124,19 @@ let
     Defaults env_keep += "SSL_CERT_FILE"
 
     @includedir /etc/sudoers.d
+  '';
+  # nixpkgs' sudo is built against PAM and aborts without a configuration
+  # for its service ("unable to initialize PAM: Critical error").
+  #
+  # Permissive on purpose: what may be run as root is decided by
+  # /etc/sudoers.d/domjudge (DOMjudge's own rules, NOPASSWD for exactly
+  # runguard and the chroot mounts), not by an authentication step. The apt
+  # image behaved the same way - Ubuntu's PAM stack with a NOPASSWD sudoers
+  # - it just inherited its configuration from the distribution.
+  pamSudo = writeText "pam-sudo" ''
+    auth     sufficient ${pam}/lib/security/pam_permit.so
+    account  required   ${pam}/lib/security/pam_permit.so
+    session  required   ${pam}/lib/security/pam_permit.so
   '';
 in
 dockerTools.buildLayeredImage {
@@ -184,6 +202,10 @@ dockerTools.buildLayeredImage {
 
     ln -sfn ${tzdata}/share/zoneinfo /etc/zoneinfo
     cat ${cacert}/etc/ssl/certs/ca-bundle.crt > ${caBundle}
+
+    mkdir -p /etc/pam.d
+    cp ${pamSudo} /etc/pam.d/sudo
+    cp ${pamSudo} /etc/pam.d/other
 
     # Everything created above belongs to root: these commands run as the
     # Nix build user, and a layer owned by another uid needs a subuid range
