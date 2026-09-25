@@ -137,6 +137,7 @@ The following environment variables are supported by the `domserver` container:
 * `MYSQL_DATABASE` (defaults to `domjudge`): set the database to use.
 * `DJ_DB_INSTALL_BARE` (defaults to `0`): set to `1` to do a `bare-install` for the database instead of a normal `install`.
 * `FPM_MAX_CHILDREN` (defaults to `40`): the maximum number of PHP FPM children to spawn.
+* `FPM_MEMORY_LIMIT` (defaults to `2G`): the maximum memory PHP FPM children can use.
 * `TRUSTED_PROXIES` (defaults to empty): The IP list of trusted proxy servers, separated by a comma(`,`).
 * `WEBAPP_BASEURL` (defaults to `/`): The Base Url of DOMserver. Such as `/domjudge`, You can access the DOMserver homepage via `http://localhost/domjudge`.
 
@@ -188,7 +189,7 @@ where `[service]` is one of `nginx` or `php`.
 To run a single judgehost, run the following command:
 
 ```bash
-docker run -it --privileged -v /sys/fs/cgroup:/sys/fs/cgroup --name judgehost-0 --net dj --hostname judgedaemon-0 -e DAEMON_ID=0 domjudge/judgehost:latest
+docker run -it --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup --name judgehost-0 --net dj --hostname judgedaemon-0 -e DAEMON_ID=0 domjudge/judgehost:latest
 ```
 
 Again, replace `latest` with a specific version if desired. Make sure the version matches the version of the domserver.
@@ -242,7 +243,7 @@ echo 127.0.0.1 $(hostname) | sudo tee -a /etc/hosts
 
 ###################################################
 # Fill in these (secret) variables yourself!!
-sudo docker run -d --restart=on-failure --network host --privileged -v /sys/fs/cgroup:/sys/fs/cgroup --name judgehost -e DOMSERVER_BASEURL=your_baseurl -e JUDGEDAEMON_USERNAME=your_username -e JUDGEDAEMON_PASSWORD=your_password domjudge/judgehost:7.0.3
+sudo docker run -d --restart=on-failure --network host --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup --name judgehost -e DOMSERVER_BASEURL=your_baseurl -e JUDGEDAEMON_USERNAME=your_username -e JUDGEDAEMON_PASSWORD=your_password domjudge/judgehost:7.0.3
 ###################################################
 
 # Enable cgroup functionality that judgehost needs, this requires a reboot
@@ -263,8 +264,11 @@ where `version` is the DOMjudge version to create the images for, e.g. `5.3.0`.
 
 To build domjudge with local sources, run
 ```bash
-  tar --exclude-vcs -czf <path to domjudge-packaging>/docker/domjudge.tar.gz <domjudge source directory>
-  cd <path to domjudge-packaging>/docker
+  dj_packaging_dir=<path to domjudge-packaging>
+
+  dj_source_dir =<domjudge source directory>
+  tar --exclude-vcs -czf "${dj_packaging_dir}/docker/domjudge.tar.gz" -C $(dirname "$dj_source_dir") $(basename "$dj_source_dir")
+  cd ${dj_packaging_dir}/docker
   docker build -t domjudge -f domserver/Dockerfile .
 ```
 Note that the source directory name has to match `domjudge-*`.

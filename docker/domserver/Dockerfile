@@ -1,34 +1,24 @@
-FROM debian:bookworm-slim AS domserver-build
+FROM ubuntu:24.04 AS domserver-build
 LABEL org.opencontainers.image.authors="DOMjudge team <team@domjudge.org>"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install required packages for build of domserver
-RUN apt-get update \
-	&& apt-get install --no-install-recommends --no-install-suggests -y \
-	autoconf automake git pkg-config \
-	gcc g++ make acl zip unzip \
-	php-cli php-zip php-bcmath \
-	php-gd php-curl php-mysql php-json php-intl \
-	php-gmp php-xml php-mbstring php-bcmath \
-	sudo bsdmainutils ntp libcgroup-dev procps \
-	python3-venv python3-yaml fontconfig \
-	texlive-latex-recommended texlive-latex-extra \
-	texlive-fonts-recommended texlive-lang-european latexmk tex-gyre \
-	libcurl4-gnutls-dev libjsoncpp-dev libmagic-dev \
-	enscript lpr ca-certificates \
-	&& rm -rf /var/lib/apt/lists/*
-
-# Use venv to install latest Sphinx. 6.1.0 or higher is required to build DOMjudge docs.
-RUN python3 -m venv /venv && . /venv/bin/activate && pip3 install sphinx sphinx-rtd-theme rst2pdf
-
 # Set up user
 RUN useradd -m domjudge
 
-# Install composer
-RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
-	&& php composer-setup.php \
-	&& mv /composer.phar /usr/local/bin/composer
+# Install required packages for build of domserver
+RUN apt-get update \
+	&& apt-get install --no-install-recommends --no-install-suggests -y \
+	autoconf automake git make \
+	acl zip unzip httpie \
+	php-cli php-zip php-bcmath \
+	php-gd php-curl php-mysql php-json php-intl \
+	php-gmp php-xml php-mbstring composer yarnpkg sudo \
+	python3-sphinx python3-sphinx-rtd-theme python3-yaml fontconfig \
+	texlive-latex-recommended texlive-latex-extra \
+	texlive-fonts-recommended texlive-lang-european latexmk tex-gyre \
+	enscript lpr ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
 
 # Add DOMjudge source code and build script
 ADD domjudge.tar.gz /domjudge-src
@@ -43,7 +33,7 @@ RUN chmod 700 /scripts/patches.sh && /scripts/patches.sh
 RUN /domjudge-src/build.sh
 
 # Now create an image with the actual build in it
-FROM debian:bookworm-slim
+FROM ubuntu:24.04
 LABEL org.opencontainers.image.authors="DOMjudge team <team@domjudge.org>"
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -54,6 +44,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 	MYSQL_PASSWORD=domjudge \
 	MYSQL_ROOT_PASSWORD=domjudge \
 	FPM_MAX_CHILDREN=40 \
+  FPM_MEMORY_LIMIT=2G \
 	DJ_DB_INSTALL_BARE=0
 
 # Set up user
@@ -62,20 +53,22 @@ RUN useradd -m domjudge
 # Install required packages for running of domserver
 RUN apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y \
-	acl curl zip unzip supervisor mariadb-client pv apache2-utils \
-	nginx php-cli php-fpm php-zip php-bcmath \
-	php-gd php-curl php-mysql php-json php-intl \
-	php-gmp php-xml php-mbstring php-ldap php-bcmath \
-	enscript \
-	printer-driver-all cups cups-pdf cups-client cups-bsd cups-filters \
-	ca-certificates python3-yaml python3-requests \
+	acl zip unzip curl supervisor mariadb-client pv \
+	nginx composer php-fpm php-zip php-bcmath \
+	php-ds php-gd php-mysql php-json php-intl php-gmp \
+	php-xml php-mbstring python3-yaml python3-requests enscript lpr \
+	printer-driver-all cups cups-pdf cups-client cups-filters \
+	ca-certificates \
 	vim wget httpie \
 	&& rm -rf /var/lib/apt/lists/*
 
-# Install composer
-RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
-	&& php composer-setup.php \
-	&& mv /composer.phar /usr/local/bin/composer
+# Check the UID and GID of the domjudge user are the same as in the previous build stage
+# (otherwise the COPY directives below won't set the correct ownership)
+COPY --from=domserver-build /etc/passwd /tmp/domserver-build-etc-passwd
+RUN sed -i -n '/^domjudge:/p' /tmp/domserver-build-etc-passwd \
+	&& sed -n '/^domjudge:/p' /etc/passwd | diff /tmp/domserver-build-etc-passwd - \
+	|| { echo "error: UID/GID of 'domjudge' differ from previous build stage; they must be the same for COPY to work" >&2; exit 1; } \
+	&& rm /tmp/domserver-build-etc-passwd
 
 # Copy domserver
 COPY --from=domserver-build /opt/domjudge/domserver /opt/domjudge/domserver
