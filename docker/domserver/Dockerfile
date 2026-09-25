@@ -10,7 +10,7 @@ RUN useradd -m domjudge
 RUN apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y \
 	autoconf automake git make \
-	acl zip unzip \
+	acl zip unzip httpie \
 	php-cli php-zip php-bcmath \
 	php-gd php-curl php-mysql php-json php-intl \
 	php-gmp php-xml php-mbstring composer yarnpkg sudo \
@@ -53,13 +53,13 @@ RUN useradd -m domjudge
 # Install required packages for running of domserver
 RUN apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y \
-	acl zip curl supervisor mariadb-client pv \
+	acl zip unzip curl supervisor mariadb-client pv \
 	nginx composer php-fpm php-zip php-bcmath \
 	php-ds php-gd php-mysql php-json php-intl php-gmp \
 	php-xml php-mbstring python3-yaml python3-requests enscript lpr \
 	printer-driver-all cups cups-pdf cups-client cups-filters \
 	ca-certificates \
-	vim wget \
+	vim wget httpie \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Check the UID and GID of the domjudge user are the same as in the previous build stage
